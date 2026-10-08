@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AZTAD Master Procurement & Lead Time Tracking System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#2563eb',
+                            600: '#1d4ed8',
+                            700: '#1e40af',
+                            800: '#1e3a8a',
+                            900: '#0f172a',
+                        },
+                        slate: {
+                            850: '#131f37',
+                            900: '#0f172a',
+                            950: '#080d1a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b1120;
+            color: #f1f5f9;
+        }
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-input {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .glass-input:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+        }
+        .badge-delayed { background-color: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-ontrack { background-color: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .badge-ahead { background-color: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-pending { background-color: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-brand-600 text-white p-2.5 rounded-xl shadow-lg shadow-brand-500/20 flex items-center justify-center">
+                <i class="fa-solid me-1 fa-boxes-packing text-lg"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xl font-bold tracking-tight text-white">AZTAD ERP Procurement</h1>
+                    <span class="text-xs bg-brand-500/20 text-brand-400 font-semibold px-2 py-0.5 rounded-full border border-brand-500/30">v2.4 Live</span>
+                </div>
+                <p class="text-xs text-slate-400">Lead Time & End-to-End Logistics Performance Matrix</p>
+            </div>
+        </div>
+
+        <!-- Header Controls -->
+        <div class="flex items-center gap-2 sm:gap-3 ml-auto">
+            <button id="btn-sample-data" onclick="app.loadSampleData()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                <span class="hidden sm:inline">Load Demo Data</span>
+            </button>
+            <button id="btn-clear-data" onclick="app.clearAllData()" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-left text-slate-400"></i>
+                <span class="hidden sm:inline">Reset Form</span>
+            </button>
+            <button onclick="app.exportToCSV()" class="px-3.5 py-1.5 text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white rounded-lg shadow-md transition flex items-center gap-1.5">
+                <i class="fa-solid fa-file-csv"></i>
+                <span>Export CSV</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+
+        <!-- 1. EXECUTIVE KPI SUMMARY CARDS -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Card 1: Total Packages -->
+            <div class="glass-panel p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-brand-500">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Packages</p>
+                    <h3 id="kpi-total-packages" class="text-3xl font-bold text-white mt-1">4</h3>
+                    <p class="text-xs text-slate-400 mt-1"><span id="kpi-active-shipments" class="text-brand-400 font-medium">4</span> active tracked</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 text-xl">
+                    <i class="fa-solid fa-box-archive"></i>
+                </div>
+            </div>
+
+            <!-- Card 2: Total Procurement Value -->
+            <div class="glass-panel p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-emerald-500">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Procurement Value</p>
+                    <h3 id="kpi-total-value" class="text-3xl font-bold text-white mt-1">$0.00</h3>
+                    <p class="text-xs text-slate-400 mt-1">Across active LC/TT</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                    <i class="fa-solid fa-sack-dollar"></i>
+                </div>
+            </div>
+
+            <!-- Card 3: Target vs Actual LT -->
+            <div class="glass-panel p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-sky-500">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">End-to-End Lead Time</p>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <h3 id="kpi-avg-actual-lt" class="text-3xl font-bold text-white">0d</h3>
+                        <span class="text-xs text-slate-400">/ Target 87d</span>
+                    </div>
+                    <p id="kpi-lt-variance-label" class="text-xs text-slate-400 mt-1">Variance: --</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 text-xl">
+                    <i class="fa-solid fa-clock font-normal"></i>
+                </div>
+            </div>
+
+            <!-- Card 4: Action Needed -->
+            <div class="glass-panel p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-amber-500">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Delayed Bottlenecks</p>
+                    <h3 id="kpi-delayed-count" class="text-3xl font-bold text-amber-400 mt-1">0</h3>
+                    <p id="kpi-status-summary" class="text-xs text-slate-400 mt-1">Stages exceeding target</p>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. END-TO-END PROCUREMENT STAGE LEAD TIME ANALYSIS -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Stage Analysis Table -->
+            <div class="lg:col-span-7 glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                        <div>
+                            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-brand-400"></i>
+                                Procurement Stage Lead Time Analysis
+                            </h2>
+                            <p class="text-xs text-slate-400">Standard targets vs. calculated actual averages across shipments</p>
+                        </div>
+                        <span class="text-xs px-2.5 py-1 bg-slate-800 text-slate-300 rounded-md border border-slate-700">7 Stages</span>
+                    </div>
+
+                    <div class="overflow-x-auto mt-4">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="text-xs text-slate-400 uppercase border-b border-slate-800/80 bg-slate-900/50">
+                                    <th class="py-3 px-3 font-semibold">Procurement Stage</th>
+                                    <th class="py-3 px-3 font-semibold text-center">Target (Days)</th>
+                                    <th class="py-3 px-3 font-semibold text-center">Actual Avg (Days)</th>
+                                    <th class="py-3 px-3 font-semibold text-center">Variance (Diff)</th>
+                                    <th class="py-3 px-3 font-semibold text-right">Stage Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stage-analysis-tbody" class="divide-y divide-slate-800/50">
+                                <!-- Dynamic dynamic rows via Javascript -->
+                            </tbody>
+                            <tfoot>
+                                <tr class="font-bold text-slate-200 bg-slate-900/80 border-t-2 border-slate-700">
+                                    <td class="py-3 px-3">Total End-to-End Lead Time</td>
+                                    <td class="py-3 px-3 text-center text-brand-400">87 Days</td>
+                                    <td id="total-actual-avg-cell" class="py-3 px-3 text-center">0 Days</td>
+                                    <td id="total-variance-cell" class="py-3 px-3 text-center">0 Days</td>
+                                    <td id="total-status-cell" class="py-3 px-3 text-right">
+                                        <span class="text-xs px-2.5 py-1 rounded-full badge-pending">Pending</span>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lead Time Visualization Chart -->
+            <div class="lg:col-span-5 glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-sky-400"></i>
+                            Target vs. Actual Benchmark
+                        </h2>
+                        <span class="text-xs text-slate-400">Days</span>
+                    </div>
+                    <div class="relative mt-4 h-[290px] w-full flex items-center justify-center">
+                        <canvas id="stageChart"></canvas>
+                    </div>
+                </div>
+                <div class="mt-2 text-center text-xs text-slate-400 flex justify-center gap-6">
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-slate-600 inline-block"></span> Target Benchmark</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-brand-500 inline-block"></span> Actual Average</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. INDIVIDUAL SHIPMENTS / PACKAGES BREAKDOWN TABLE -->
+        <section class="glass-panel rounded-2xl p-5 border border-slate-800 space-y-4">
+            <!-- Table Header Controls -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                <div>
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-truck-fast text-emerald-400"></i>
+                        Shipments & Packages Lead Time Breakdown
+                    </h2>
+                    <p class="text-xs text-slate-400">Individual package lifecycle stages and total turnaround calculation</p>
+                </div>
+
+                <!-- Filters & New Package CTA -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Search -->
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="filter-search" oninput="app.renderPackagesTable()" placeholder="Search Package ID/Supplier..." class="glass-input pl-8 pr-3 py-1.5 rounded-lg text-xs text-slate-200 placeholder-slate-500 w-48 sm:w-60 focus:w-64 transition-all">
+                    </div>
+                    <!-- Status Filter -->
+                    <select id="filter-status" onchange="app.renderPackagesTable()" class="glass-input px-3 py-1.5 rounded-lg text-xs text-slate-200">
+                        <option value="ALL">All Statuses</option>
+                        <option value="On Track">On Track</option>
+                        <option value="Delayed">Delayed</option>
+                        <option value="In Transit">In Transit</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                    <!-- Add Shipment Button -->
+                    <button onclick="app.openModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white rounded-lg shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Add Shipment</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Shipments Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="text-slate-400 uppercase border-b border-slate-800 bg-slate-900/60">
+                            <th class="py-3 px-3 font-semibold min-w-[110px]">Package ID</th>
+                            <th class="py-3 px-3 font-semibold min-w-[150px]">Description</th>
+                            <th class="py-3 px-3 font-semibold min-w-[120px]">Supplier</th>
+                            <th class="py-3 px-3 font-semibold text-center">S1 (Sel)</th>
+                            <th class="py-3 px-3 font-semibold text-center">S2 (Bank)</th>
+                            <th class="py-3 px-3 font-semibold text-center">S3 (Ship)</th>
+                            <th class="py-3 px-3 font-semibold text-center">S4 (Djib)</th>
+                            <th class="py-3 px-3 font-semibold text-center">S5 (Modj)</th>
+                            <th class="py-3 px-3 font-semibold text-center">S6 (Clr)</th>
+                            <th class="py-3 px-3 font-semibold text-center">S7 (Whs)</th>
+                            <th class="py-3 px-3 font-semibold text-center min-w-[90px]">Total LT</th>
+                            <th class="py-3 px-3 font-semibold text-center min-w-[100px]">Status</th>
+                            <th class="py-3 px-3 font-semibold text-right min-w-[80px]">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="packages-tbody" class="divide-y divide-slate-800/60 text-slate-300">
+                        <!-- Dynamic Shipment Rows Rendered via JS -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row justify-between items-center pt-2 text-xs text-slate-400 gap-2">
+                <span>Stages: S1=Supplier Selection (7d) | S2=Bank Process (14d) | S3=Ready for Shipment (21d) | S4=Delivery Djibouti (25d) | S5=Reshipment Modjo (10d) | S6=Clearance (7d) | S7=Delivery Warehouse (3d)</span>
+                <span id="shipments-count-label">Showing 4 of 4 packages</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- ADD / EDIT SHIPMENT MODAL -->
+    <div id="shipment-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                <h3 id="modal-title" class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-box text-brand-400"></i> Edit Package Lead Times
+                </h3>
+                <button onclick="app.closeModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form id="shipment-form" onsubmit="app.handleFormSubmit(event)" class="mt-4 space-y-4">
+                <input type="hidden" id="form-package-index">
+
+                <!-- Basic Info -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Package ID</label>
+                        <input type="text" id="form-id" required placeholder="e.g. AZTAD-005" class="glass-input w-full px-3 py-2 rounded-lg text-xs text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Supplier Name</label>
+                        <input type="text" id="form-supplier" required placeholder="e.g. SinoTech Ltd" class="glass-input w-full px-3 py-2 rounded-lg text-xs text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Value ($ USD)</label>
+                        <input type="number" id="form-value" required step="0.01" placeholder="0.00" class="glass-input w-full px-3 py-2 rounded-lg text-xs text-white">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Item Description</label>
+                        <input type="text" id="form-desc" required placeholder="e.g. Industrial Steel Sheet Rolls" class="glass-input w-full px-3 py-2 rounded-lg text-xs text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Payment Method / Status</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="form-payment" class="glass-input w-full px-2 py-2 rounded-lg text-xs text-white">
+                                <option value="LC">Letter of Credit (LC)</option>
+                                <option value="TT">Forex TT</option>
+                                <option value="CAD">CAD</option>
+                            </select>
+                            <select id="form-status" class="glass-input w-full px-2 py-2 rounded-lg text-xs text-white">
+                                <option value="In Transit">In Transit</option>
+                                <option value="On Track">On Track</option>
+                                <option value="Delayed">Delayed</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stage Lead Times Input Grid -->
+                <div class="pt-2 border-t border-slate-800">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-brand-400">Stage Lead Times (Days Spent)</span>
+                        <span class="text-[11px] text-slate-400">Leave blank if stage not reached</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">1. Supplier Selection</label>
+                            <input type="number" id="form-s1" min="0" placeholder="Target: 7" class="glass-input w-full px-2.5 py-1.5 rounded-lg text-xs text-white text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">2. Bank Process</label>
+                            <input type="number" id="form-s2" min="0" placeholder="Target: 14" class="glass-input w-full px-2.5 py-1.5 rounded-lg text-xs text-white text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">3. Ready for Shipment</label>
+                            <input type="number" id="form-s3" min="0" placeholder="Target: 21" class="glass-input w-full px-2.5 py-1.5 rounded-lg text-xs text-white text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">4. Delivery Djibouti</label>
+                            <input type="number" id="form-s4" min="0" placeholder="Target: 25" class="glass-input w-full px-2.5 py-1.5 rounded-lg text-xs text-white text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">5. Reshipment Modjo</label>
+                            <input type="number" id="form-s5" min="0" placeholder="Target: 10" class="glass-input w-full px-2.5 py-1.5 rounded-lg text-xs text-white text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">6. Customs Clearance</label>
+                            <input type="number" id="form-s6" min="0" placeholder="Target: 7" class="glass-input w-full px-2.5 py-1.5 rounded-lg text-xs text-white text-center">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1">7. Delivery Warehouse</label>
+                            <input type="number" id="form-s7" min="0" placeholder="Target: 3" class="glass-input w-full px-2.5 py-1.5 rounded-lg text-xs text-white text-center">
+                        </div>
+                        <div class="flex flex-col justify-end">
+                            <div class="bg-brand-900/40 border border-brand-500/30 rounded-lg p-1.5 text-center">
+                                <span class="block text-[10px] text-slate-400 uppercase">Target Sum</span>
+                                <span class="text-xs font-bold text-brand-400">87 Days</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                    <button type="button" onclick="app.closeModal()" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white rounded-lg shadow transition">Save Shipment Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION CORE -->
+    <script>
+        // Stage Metadata and Benchmarks
+        const PROCUREMENT_STAGES = [
+            { id: 's1', name: 'Supplier Selection', target: 7, key: 's1' },
+            { id: 's2', name: 'Bank Process', target: 14, key: 's2' },
+            { id: 's3', name: 'Ready for Shipment', target: 21, key: 's3' },
+            { id: 's4', name: 'Delivery to Djibouti', target: 25, key: 's4' },
+            { id: 's5', name: 'Reshipment to Modjo', target: 10, key: 's5' },
+            { id: 's6', name: 'Clearance', target: 7, key: 's6' },
+            { id: 's7', name: 'Delivery to Warehouse', target: 3, key: 's7' }
+        ];
+
+        // Sample Pre-populated Data
+        const SAMPLE_PACKAGES = [
+            { id: 'AZTAD-001', desc: 'Raw Material Polyethylene Granules', supplier: 'SABIC Petrochemicals', value: 85000, payment: 'LC', status: 'On Track', s1: 6, s2: 12, s3: 20, s4: 24, s5: 9, s6: 6, s7: 2 },
+            { id: 'AZTAD-002', desc: 'Packaging Machinery Spare Parts', supplier: 'Guangzhou Mech Co.', value: 24500, payment: 'TT', status: 'Delayed', s1: 9, s2: 18, s3: 25, s4: 28, s5: 12, s6: 8, s7: 4 },
+            { id: 'AZTAD-003', desc: 'Industrial Chemical Additives', supplier: 'BASF East Africa', value: 42000, payment: 'LC', status: 'In Transit', s1: 7, s2: 14, s3: 21, s4: 22, s5: null, s6: null, s7: null },
+            { id: 'AZTAD-004', desc: 'Corrugated Box Folding Line', supplier: 'Bobst Shanghai', value: 135000, payment: 'LC', status: 'Completed', s1: 5, s2: 13, s3: 19, s4: 25, s5: 10, s6: 7, s7: 3 }
+        ];
+
+        // Blank Template Setup
+        const BLANK_PACKAGES = [
+            { id: 'AZTAD-001', desc: 'Package 01 Item', supplier: '--', value: 0, payment: 'LC', status: 'In Transit', s1: null, s2: null, s3: null, s4: null, s5: null, s6: null, s7: null },
+            { id: 'AZTAD-002', desc: 'Package 02 Item', supplier: '--', value: 0, payment: 'LC', status: 'In Transit', s1: null, s2: null, s3: null, s4: null, s5: null, s6: null, s7: null },
+            { id: 'AZTAD-003', desc: 'Package 03 Item', supplier: '--', value: 0, payment: 'TT', status: 'In Transit', s1: null, s2: null, s3: null, s4: null, s5: null, s6: null, s7: null },
+            { id: 'AZTAD-004', desc: 'Package 04 Item', supplier: '--', value: 0, payment: 'LC', status: 'In Transit', s1: null, s2: null, s3: null, s4: null, s5: null, s6: null, s7: null }
+        ];
+
+        class ProcurementApp {
+            constructor() {
+                this.packages = JSON.parse(localStorage.getItem('aztad_procurement_data')) || [...SAMPLE_PACKAGES];
+                this.chart = null;
+                this.init();
+            }
+
+            init() {
+                this.initChart();
+                this.refreshUI();
+            }
+
+            // Save state to localStorage
+            saveState() {
+                localStorage.setItem('aztad_procurement_data', JSON.stringify(this.packages));
+                this.refreshUI();
+            }
+
+            loadSampleData() {
+                this.packages = JSON.parse(JSON.stringify(SAMPLE_PACKAGES));
+                this.saveState();
+            }
+
+            clearAllData() {
+                this.packages = JSON.parse(JSON.stringify(BLANK_PACKAGES));
+                this.saveState();
+            }
+
+            // Calculate Stage Averages dynamically
+            calculateStageAverages() {
+                const averages = {};
+                PROCUREMENT_STAGES.forEach(stage => {
+                    const validValues = this.packages
+                        .map(p => p[stage.key])
+                        .filter(val => val !== null && val !== undefined && !isNaN(val) && val !== '');
+
+                    if (validValues.length > 0) {
+                        const sum = validValues.reduce((acc, curr) => acc + Number(curr), 0);
+                        averages[stage.key] = Math.round((sum / validValues.length) * 10) / 10;
+                    } else {
+                        averages[stage.key] = null;
+                    }
+                });
+                return averages;
+            }
+
+            // Calculate Total Package LT
+            calculatePackageTotal(p) {
+                let sum = 0;
+                let count = 0;
+                PROCUREMENT_STAGES.forEach(stage => {
+                    if (p[stage.key] !== null && p[stage.key] !== undefined && p[stage.key] !== '') {
+                        sum += Number(p[stage.key]);
+                        count++;
+                    }
+                });
+                return count > 0 ? sum : null;
+            }
+
+            // Refresh All Dashboard Views
+            refreshUI() {
+                this.renderKPIs();
+                this.renderStageAnalysisTable();
+                this.renderPackagesTable();
+                this.updateChart();
+            }
+
+            renderKPIs() {
+                const totalPackages = this.packages.length;
+                const totalVal = this.packages.reduce((acc, p) => acc + (Number(p.value) || 0), 0);
+                
+                // End to end actual average
+                const averages = this.calculateStageAverages();
+                let totalActualAvg = 0;
+                let activeStages = 0;
+
+                PROCUREMENT_STAGES.forEach(s => {
+                    if (averages[s.key] !== null) {
+                        totalActualAvg += averages[s.key];
+                        activeStages++;
+                    }
+                });
+
+                totalActualAvg = Math.round(totalActualAvg * 10) / 10;
+                const targetEndToEnd = 87;
+                const variance = totalActualAvg > 0 ? Math.round((totalActualAvg - targetEndToEnd) * 10) / 10 : 0;
+
+                // Delayed Count
+                let delayedStagesCount = 0;
+                PROCUREMENT_STAGES.forEach(s => {
+                    if (averages[s.key] !== null && averages[s.key] > s.target) {
+                        delayedStagesCount++;
+                    }
+                });
+
+                // Update DOM Elements
+                document.getElementById('kpi-total-packages').innerText = totalPackages;
+                document.getElementById('kpi-active-shipments').innerText = totalPackages;
+                document.getElementById('kpi-total-value').innerText = '$' + totalVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('kpi-avg-actual-lt').innerText = totalActualAvg > 0 ? `${totalActualAvg}d` : '--';
+                
+                const varLabel = document.getElementById('kpi-lt-variance-label');
+                if (totalActualAvg === 0) {
+                    varLabel.innerText = 'Variance: Awaiting Data';
+                    varLabel.className = 'text-xs text-slate-400 mt-1';
+                } else if (variance > 0) {
+                    varLabel.innerText = `Variance: +${variance} days delay`;
+                    varLabel.className = 'text-xs font-semibold text-rose-400 mt-1';
+                } else {
+                    varLabel.innerText = `Variance: ${variance} days ahead`;
+                    varLabel.className = 'text-xs font-semibold text-emerald-400 mt-1';
+                }
+
+                document.getElementById('kpi-delayed-count').innerText = delayedStagesCount;
+                document.getElementById('kpi-status-summary').innerText = delayedStagesCount > 0 
+                    ? `${delayedStagesCount} stage(s) exceeding target` 
+                    : 'All stages performing on target';
+            }
+
+            renderStageAnalysisTable() {
+                const tbody = document.getElementById('stage-analysis-tbody');
+                const averages = this.calculateStageAverages();
+                tbody.innerHTML = '';
+
+                let totalTarget = 0;
+                let totalActual = 0;
+                let activeCount = 0;
+
+                PROCUREMENT_STAGES.forEach((stage, idx) => {
+                    totalTarget += stage.target;
+                    const avgActual = averages[stage.key];
+                    let varianceText = '-';
+                    let statusBadge = '<span class="px-2 py-0.5 text-[11px] rounded-full badge-pending">Awaiting Data</span>';
+
+                    if (avgActual !== null) {
+                        totalActual += avgActual;
+                        activeCount++;
+                        const diff = Math.round((avgActual - stage.target) * 10) / 10;
+                        varianceText = diff > 0 ? `+${diff} d` : `${diff} d`;
+
+                        if (diff > 0) {
+                            statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-medium rounded-full badge-delayed"><i class="fa-solid fa-angle-up mr-1"></i>Delayed</span>';
+                        } else if (diff < 0) {
+                            statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-medium rounded-full badge-ahead"><i class="fa-solid fa-angle-down mr-1"></i>Ahead</span>';
+                        } else {
+                            statusBadge = '<span class="px-2.5 py-0.5 text-[11px] font-medium rounded-full badge-ontrack"><i class="fa-solid fa-check mr-1"></i>On Track</span>';
+                        }
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-800/40 transition';
+                    tr.innerHTML = `
+                        <td class="py-2.5 px-3 font-medium text-slate-200">
+                            <span class="text-slate-500 mr-1.5">${idx + 1}.</span>${stage.name}
+                        </td>
+                        <td class="py-2.5 px-3 text-center text-slate-400 font-medium">${stage.target} d</td>
+                        <td class="py-2.5 px-3 text-center font-bold ${avgActual !== null ? 'text-white' : 'text-slate-500'}">
+                            ${avgActual !== null ? avgActual + ' d' : '-'}
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-semibold ${varianceText.startsWith('+') ? 'text-rose-400' : (varianceText.startsWith('-') && varianceText !== '-' ? 'text-emerald-400' : 'text-slate-400')}">
+                            ${varianceText}
+                        </td>
+                        <td class="py-2.5 px-3 text-right">${statusBadge}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                // Update Total Row
+                totalActual = Math.round(totalActual * 10) / 10;
+                document.getElementById('total-actual-avg-cell').innerText = activeCount > 0 ? `${totalActual} Days` : '-';
+                
+                const totalDiff = activeCount > 0 ? Math.round((totalActual - totalTarget) * 10) / 10 : 0;
+                const totalVarCell = document.getElementById('total-variance-cell');
+                const totalStatusCell = document.getElementById('total-status-cell');
+
+                if (activeCount === 0) {
+                    totalVarCell.innerText = '-';
+                    totalVarCell.className = 'py-3 px-3 text-center text-slate-500';
+                    totalStatusCell.innerHTML = '<span class="px-2.5 py-0.5 text-[11px] rounded-full badge-pending">Pending</span>';
+                } else {
+                    totalVarCell.innerText = totalDiff > 0 ? `+${totalDiff} Days` : `${totalDiff} Days`;
+                    totalVarCell.className = `py-3 px-3 text-center font-bold ${totalDiff > 0 ? 'text-rose-400' : 'text-emerald-400'}`;
+                    
+                    if (totalDiff > 0) {
+                        totalStatusCell.innerHTML = '<span class="px-2.5 py-1 text-xs font-semibold rounded-full badge-delayed">Overall Delayed</span>';
+                    } else {
+                        totalStatusCell.innerHTML = '<span class="px-2.5 py-1 text-xs font-semibold rounded-full badge-ontrack">Overall On Track</span>';
+                    }
+                }
+            }
+
+            renderPackagesTable() {
+                const tbody = document.getElementById('packages-tbody');
+                const searchVal = document.getElementById('filter-search').value.toLowerCase();
+                const statusVal = document.getElementById('filter-status').value;
+
+                tbody.innerHTML = '';
+
+                const filtered = this.packages.filter(p => {
+                    const matchesSearch = p.id.toLowerCase().includes(searchVal) || 
+                                          p.supplier.toLowerCase().includes(searchVal) ||
+                                          p.desc.toLowerCase().includes(searchVal);
+                    const matchesStatus = statusVal === 'ALL' || p.status === statusVal;
+                    return matchesSearch && matchesStatus;
+                });
+
+                filtered.forEach((p, idx) => {
+                    const originalIdx = this.packages.findIndex(pkg => pkg.id === p.id);
+                    const totalLT = this.calculatePackageTotal(p);
+
+                    let statusBadgeClass = 'badge-pending';
+                    if (p.status === 'On Track') statusBadgeClass = 'badge-ontrack';
+                    if (p.status === 'Delayed') statusBadgeClass = 'badge-delayed';
+                    if (p.status === 'Completed') statusBadgeClass = 'badge-ahead';
+                    if (p.status === 'In Transit') statusBadgeClass = 'badge-pending';
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-800/50 transition border-b border-slate-800/40';
+                    tr.innerHTML = `
+                        <td class="py-3 px-3 font-semibold text-brand-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-box-check text-slate-500 text-[10px]"></i>
+                            ${p.id}
+                        </td>
+                        <td class="py-3 px-3 text-slate-200 font-medium truncate max-w-[160px]" title="${p.desc}">${p.desc}</td>
+                        <td class="py-3 px-3 text-slate-400 truncate max-w-[120px]" title="${p.supplier}">${p.supplier}</td>
+                        <td class="py-3 px-3 text-center ${p.s1 > 7 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${p.s1 ?? '-'}</td>
+                        <td class="py-3 px-3 text-center ${p.s2 > 14 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${p.s2 ?? '-'}</td>
+                        <td class="py-3 px-3 text-center ${p.s3 > 21 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${p.s3 ?? '-'}</td>
+                        <td class="py-3 px-3 text-center ${p.s4 > 25 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${p.s4 ?? '-'}</td>
+                        <td class="py-3 px-3 text-center ${p.s5 > 10 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${p.s5 ?? '-'}</td>
+                        <td class="py-3 px-3 text-center ${p.s6 > 7 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${p.s6 ?? '-'}</td>
+                        <td class="py-3 px-3 text-center ${p.s7 > 3 ? 'text-rose-400 font-bold' : 'text-slate-300'}">${p.s7 ?? '-'}</td>
+                        <td class="py-3 px-3 text-center font-bold text-white bg-slate-900/40">${totalLT ? totalLT + ' d' : '-'}</td>
+                        <td class="py-3 px-3 text-center">
+                            <span class="px-2 py-0.5 text-[10px] font-semibold rounded-full ${statusBadgeClass}">${p.status}</span>
+                        </td>
+                        <td class="py-3 px-3 text-right">
+                            <button onclick="app.openModal(${originalIdx})" class="p-1.5 text-slate-400 hover:text-brand-400 hover:bg-slate-800 rounded transition" title="Edit Shipment">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="app.deletePackage(${originalIdx})" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition" title="Delete Shipment">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('shipments-count-label').innerText = `Showing ${filtered.length} of ${this.packages.length} packages`;
+            }
+
+            initChart() {
+                const ctx = document.getElementById('stageChart').getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['S1 Selection', 'S2 Bank', 'S3 Ready', 'S4 Djibouti', 'S5 Modjo', 'S6 Clearance', 'S7 Warehouse'],
+                        datasets: [
+                            {
+                                label: 'Target (Days)',
+                                data: PROCUREMENT_STAGES.map(s => s.target),
+                                backgroundColor: 'rgba(71, 85, 105, 0.6)',
+                                borderColor: 'rgba(100, 116, 139, 1)',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                barPercentage: 0.6
+                            },
+                            {
+                                label: 'Actual Avg (Days)',
+                                data: [0, 0, 0, 0, 0, 0, 0],
+                                backgroundColor: 'rgba(37, 99, 235, 0.85)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                barPercentage: 0.6
+                            }
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#0f172a',
+                                titleColor: '#f8fafc',
+                                bodyColor: '#cbd5e1',
+                                borderColor: '#334155',
+                                borderWidth: 1,
+                                padding: 10,
+                                cornerRadius: 8
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                ticks: { color: '#94a3b8', font: { size: 10 } }
+                            },
+                            y: {
+                                grid: { display: false },
+                                ticks: { color: '#cbd5e1', font: { size: 10, weight: '500' } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            updateChart() {
+                if (!this.chart) return;
+                const averages = this.calculateStageAverages();
+                const actualData = PROCUREMENT_STAGES.map(s => averages[s.key] ?? 0);
+                
+                this.chart.data.datasets[1].data = actualData;
+                
+                // Color bar dynamic warning if exceeding target
+                const barColors = PROCUREMENT_STAGES.map((s, idx) => {
+                    const actual = actualData[idx];
+                    if (actual > s.target) return 'rgba(239, 68, 68, 0.85)'; // Red for delayed
+                    return 'rgba(37, 99, 235, 0.85)'; // Blue standard
+                });
+                
+                this.chart.data.datasets[1].backgroundColor = barColors;
+                this.chart.update();
+            }
+
+            // Modal Handlers
+            openModal(index = null) {
+                const modal = document.getElementById('shipment-modal');
+                const form = document.getElementById('shipment-form');
+                form.reset();
+
+                if (index !== null) {
+                    const pkg = this.packages[index];
+                    document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-400"></i> Edit Package: ${pkg.id}`;
+                    document.getElementById('form-package-index').value = index;
+                    document.getElementById('form-id').value = pkg.id;
+                    document.getElementById('form-supplier').value = pkg.supplier;
+                    document.getElementById('form-value').value = pkg.value;
+                    document.getElementById('form-desc').value = pkg.desc;
+                    document.getElementById('form-payment').value = pkg.payment || 'LC';
+                    document.getElementById('form-status').value = pkg.status || 'In Transit';
+
+                    PROCUREMENT_STAGES.forEach(s => {
+                        document.getElementById(`form-${s.key}`).value = pkg[s.key] !== null ? pkg[s.key] : '';
+                    });
+                } else {
+                    document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-plus text-brand-400"></i> Add New Shipment Package`;
+                    document.getElementById('form-package-index').value = '';
+                    document.getElementById('form-id').value = `AZTAD-00${this.packages.length + 1}`;
+                }
+
+                modal.classList.remove('hidden');
+            }
+
+            closeModal() {
+                document.getElementById('shipment-modal').classList.add('hidden');
+            }
+
+            handleFormSubmit(e) {
+                e.preventDefault();
+                const idxVal = document.getElementById('form-package-index').value;
+
+                const pkgData = {
+                    id: document.getElementById('form-id').value,
+                    supplier: document.getElementById('form-supplier').value,
+                    value: parseFloat(document.getElementById('form-value').value) || 0,
+                    desc: document.getElementById('form-desc').value,
+                    payment: document.getElementById('form-payment').value,
+                    status: document.getElementById('form-status').value,
+                };
+
+                PROCUREMENT_STAGES.forEach(s => {
+                    const val = document.getElementById(`form-${s.key}`).value;
+                    pkgData[s.key] = val !== '' ? Number(val) : null;
+                });
+
+                if (idxVal !== '') {
+                    this.packages[parseInt(idxVal)] = pkgData;
+                } else {
+                    this.packages.push(pkgData);
+                }
+
+                this.saveState();
+                this.closeModal();
+            }
+
+            deletePackage(index) {
+                if (confirm(`Are you sure you want to delete package ${this.packages[index].id}?`)) {
+                    this.packages.splice(index, 1);
+                    this.saveState();
+                }
+            }
+
+            exportToCSV() {
+                const headers = ['Package ID', 'Description', 'Supplier', 'Value USD', 'Payment', 'Status', 'S1_Selection', 'S2_Bank', 'S3_Ready', 'S4_Djibouti', 'S5_Modjo', 'S6_Clearance', 'S7_Warehouse', 'Total_LT'];
+                const rows = this.packages.map(p => [
+                    `"${p.id}"`,
+                    `"${p.desc}"`,
+                    `"${p.supplier}"`,
+                    p.value,
+                    `"${p.payment}"`,
+                    `"${p.status}"`,
+                    p.s1 ?? '',
+                    p.s2 ?? '',
+                    p.s3 ?? '',
+                    p.s4 ?? '',
+                    p.s5 ?? '',
+                    p.s6 ?? '',
+                    p.s7 ?? '',
+                    this.calculatePackageTotal(p) ?? ''
+                ]);
+
+                const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement('a');
+                link.setAttribute('href', encodedUri);
+                link.setAttribute('download', `AZTAD_Procurement_LeadTimes_${new Date().toISOString().slice(0,10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // Initialize App on Window Load
+        let app;
+        window.onload = function() {
+            app = new ProcurementApp();
+        };
+    </script>
+</body>
+</html>
